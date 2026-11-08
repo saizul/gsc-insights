@@ -1,0 +1,46 @@
+# gsc-insights configuration. Every key is optional.
+title: "Search Console insights"
+top_n: 10
+
+# Regular expressions (case-insensitive) that identify branded queries.
+brand:
+  patterns:
+    - "brightleaf"
+    - "bright\\s*leaf"
+
+# Expected CTR by average position (fractions). Tune it with your own data.
+ctr_curve:
+  1: 0.28
+  2: 0.15
+  3: 0.10
+  4: 0.075
+  5: 0.058
+  10: 0.020
+  20: 0.0045
+
+quick_wins:
+  min_impressions: 100
+  min_position: 4
+  max_position: 20
+  ctr_gap_ratio: 0.8        # flag when CTR < expected * ratio
+  min_extra_clicks: 1
+  limit: 50
+
+declining:
+  min_impressions: 50       # impressions in period A
+  min_click_drop: 5
+  min_pct_drop: 20
+  limit: 50
+
+cannibalisation:
+  min_query_impressions: 50
+  min_page_impressions: 5
+  min_pages: 2
+  normalize_urls: true      # ignore query strings, fragments, trailing slashes
+  exclude_branded: false
+  limit: 50
+
+movers:
+  min_impressions: 50
+  min_position_change: 3
+  limit: 10
