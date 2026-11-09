@@ -74,6 +74,14 @@ Every command accepts `-f table|csv|json`, `-o FILE` and `--limit N` (`0` for no
 gsc-insights quick-wins export.zip -f csv -o quick-wins.csv
 ```
 
+`quick-wins`, `declining` and `movers` also accept `--min-impressions N` to raise or lower the
+impression threshold for a single run without editing your config file (it overrides
+`min_impressions` from the config).
+
+```bash
+gsc-insights quick-wins export.zip --min-impressions 500
+```
+
 ## How the analyses work
 
 **Quick wins.** A row qualifies when its average position is between `min_position` and
