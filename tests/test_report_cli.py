@@ -218,3 +218,29 @@ def test_cli_init_config(capsys, tmp_path):
 def test_cli_works_on_zip(capsys, export_zip):
     code, out, _ = run(capsys, "breakdown", export_zip, "-f", "csv")
     assert code == 0 and "Mobile" in out
+
+
+def test_min_impressions_flag_filters_quick_wins(capsys):
+    base = ["quick-wins", str(EXAMPLES / "period_b"), "-f", "json", "--limit", "0"]
+    assert main(base) == 0
+    default_rows = json.loads(capsys.readouterr().out)
+    assert default_rows
+    top = max(r["impressions"] for r in default_rows)
+    assert main([*base, "--min-impressions", str(top + 1)]) == 0
+    assert json.loads(capsys.readouterr().out) == []
+    assert main([*base, "--min-impressions", "0"]) == 0
+    assert len(json.loads(capsys.readouterr().out)) >= len(default_rows)
+
+
+def test_min_impressions_flag_applies_to_compare_commands(capsys):
+    a, b = str(EXAMPLES / "period_a"), str(EXAMPLES / "period_b")
+    for command in ("declining", "movers"):
+        assert main([command, a, b, "-f", "json", "--min-impressions", "10000000"]) == 0
+        assert json.loads(capsys.readouterr().out) == []
+
+
+def test_min_impressions_flag_rejects_negative(capsys):
+    with pytest.raises(SystemExit) as exc:
+        main(["quick-wins", str(EXAMPLES / "period_b"), "--min-impressions", "-5"])
+    assert exc.value.code == 2
+    assert "must be 0 or greater" in capsys.readouterr().err
