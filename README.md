@@ -161,3 +161,13 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). All example data is synthetic.
 ## License
 
 MIT, see [LICENSE](LICENSE).
+
+## Run with Docker
+
+A multi-arch image (amd64, arm64) is published to GitHub Container Registry on every change to `main`, so you can run the tool without installing Python:
+
+```bash
+docker run --rm -v "$PWD:/work" ghcr.io/saizul/gsc-insights:latest --help
+```
+
+Mount the folder that holds your input files (and where reports should be written) at `/work`.
