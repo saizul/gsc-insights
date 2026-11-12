@@ -14,12 +14,20 @@ from .analysis import (
     compare,
     compile_brand,
     declining,
+    find_anomalies,
     find_cannibalisation,
     find_movers,
     quick_wins,
     split_branded,
 )
-from .config import EXAMPLE_CONFIG, Config, load_config
+from .config import (
+    ANOMALY_BASELINES,
+    ANOMALY_METRICS,
+    EXAMPLE_CONFIG,
+    Config,
+    load_config,
+    validate_anomalies,
+)
 from .errors import ConfigError, GscInsightsError, LoadError
 from .insights import build_insights
 from .loader import load
@@ -99,6 +107,19 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("breakdown", help="device or country share of traffic")
     p.add_argument("export")
     p.add_argument("--by", choices=("devices", "countries"), default="devices")
+    _common(p)
+
+    p = sub.add_parser("anomalies", help="days that break sharply from their recent baseline")
+    p.add_argument("export", help="export with Dates.csv (or any file with a date column)")
+    p.add_argument("--metric", choices=ANOMALY_METRICS, help="metric to check (default: clicks)")
+    p.add_argument(
+        "--baseline",
+        choices=ANOMALY_BASELINES,
+        help="weekday: day-of-week aware median (default); rolling: plain median",
+    )
+    p.add_argument("--window", type=_non_negative_int, metavar="DAYS", help="trailing days in the baseline")
+    p.add_argument("--threshold", type=float, metavar="Z", help="robust z-score needed to flag a day")
+    p.add_argument("--min-pct-change", type=float, metavar="PCT", help="minimum %% change from expected")
     _common(p)
 
     p = sub.add_parser("report", help="write an HTML report and CSV files")
@@ -193,6 +214,27 @@ def cmd_breakdown(args: argparse.Namespace, cfg: Config) -> None:
     _emit(args, f"Breakdown by {args.by}", "breakdown", rows)
 
 
+def cmd_anomalies(args: argparse.Namespace, cfg: Config) -> None:
+    ds = load(args.export)
+    overrides = {
+        name: value
+        for name, value in (
+            ("metric", args.metric),
+            ("baseline", args.baseline),
+            ("window", args.window),
+            ("z_threshold", args.threshold),
+            ("min_pct_change", args.min_pct_change),
+        )
+        if value is not None
+    }
+    section = dataclasses.replace(cfg.anomalies, **overrides)
+    if args.window is not None:
+        # Keep the history requirement satisfiable when only the window changes.
+        section.min_history = min(section.min_history, args.window)
+    items = find_anomalies(_table(ds, "dates"), validate_anomalies(section), limit=_limit(args))
+    _emit(args, f"Daily {section.metric} anomalies ({section.baseline} baseline)", "anomalies", items)
+
+
 def cmd_report(args: argparse.Namespace, cfg: Config) -> None:
     current = load(args.export)
     previous = load(args.compare) if args.compare else None
@@ -218,6 +260,7 @@ COMMANDS: Dict[str, Callable[[argparse.Namespace, Config], None]] = {
     "cannibalisation": cmd_cannibalisation,
     "branded": cmd_branded,
     "breakdown": cmd_breakdown,
+    "anomalies": cmd_anomalies,
     "report": cmd_report,
     "init-config": cmd_init_config,
 }

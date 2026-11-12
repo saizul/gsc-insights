@@ -107,6 +107,10 @@ COUNTRIES = [
 DEVICES = [("Mobile", 0.58, 1.15, 0.95), ("Desktop", 0.37, 0.85, 1.0), ("Tablet", 0.05, 0.8, 1.05)]
 
 
+# Index into period B's daily rows that gets a sharp, synthetic traffic dip.
+ANOMALY_DAY = 20
+
+
 def clicks_for(rng: random.Random, impr: int, pos: float, factor: float) -> int:
     noise = 0.92 + rng.random() * 0.16
     return int(round(impr * expected_ctr(pos, DEFAULT_CTR_CURVE) * factor * noise))
@@ -190,6 +194,10 @@ def build_period(name: str, start: date, use_b: bool, seed: int) -> None:
                 avg_pos + rng.random() * 0.4 - 0.2,
             )
         )
+    if use_b:
+        # A one-day dip (think broken tracking or a deploy gone wrong) for `anomalies`.
+        day, clicks, impr, pos = daily[ANOMALY_DAY]
+        daily[ANOMALY_DAY] = (day, int(clicks * 0.45), int(impr * 0.6), pos)
     write_ui(out / "Dates.csv", "Date", daily)
 
     if use_b:

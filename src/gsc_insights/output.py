@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Sequence
 from rich.console import Console
 from rich.table import Table as RichTable
 
+from .analysis.anomalies import Anomaly
 from .analysis.branded import Segment
 from .analysis.breakdown import ShareRow
 from .analysis.compare import Change
@@ -22,6 +23,7 @@ COLUMNS: Dict[str, List[str]] = {
     "changes": [f.name for f in fields(Change)],
     "breakdown": [f.name for f in fields(ShareRow)],
     "branded": [f.name for f in fields(Segment)],
+    "anomalies": [f.name for f in fields(Anomaly)],
     "cannibalisation": [
         "query",
         "pages",
@@ -73,6 +75,17 @@ def write_text(path: str | Path, text: str) -> Path:
 
 
 DISPLAY: Dict[str, List[str]] = {
+    "anomalies": [
+        "date",
+        "weekday",
+        "value",
+        "expected",
+        "delta",
+        "pct_change",
+        "z_score",
+        "direction",
+        "missing",
+    ],
     "changes": [
         "key",
         "status",

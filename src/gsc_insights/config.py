@@ -71,6 +71,20 @@ class MoversConfig:
 
 
 @dataclass
+class AnomaliesConfig:
+    metric: str = "clicks"
+    baseline: str = "weekday"
+    window: int = 28
+    min_history: int = 14
+    z_threshold: float = 3.0
+    min_pct_change: float = 20.0
+    min_spread_ratio: float = 0.05
+    min_expected: float = 10.0
+    fill_gaps: bool = True
+    limit: int = 50
+
+
+@dataclass
 class BrandConfig:
     patterns: List[str] = field(default_factory=list)
 
@@ -85,6 +99,7 @@ class Config:
     declining: DecliningConfig = field(default_factory=DecliningConfig)
     cannibalisation: CannibalisationConfig = field(default_factory=CannibalisationConfig)
     movers: MoversConfig = field(default_factory=MoversConfig)
+    anomalies: AnomaliesConfig = field(default_factory=AnomaliesConfig)
 
 
 _SECTIONS = {
@@ -93,6 +108,7 @@ _SECTIONS = {
     "declining": DecliningConfig,
     "cannibalisation": CannibalisationConfig,
     "movers": MoversConfig,
+    "anomalies": AnomaliesConfig,
 }
 
 
@@ -126,6 +142,23 @@ def _build_section(cls: type, name: str, data: Any) -> Any:
     return obj
 
 
+ANOMALY_METRICS = ("clicks", "impressions", "ctr", "position")
+ANOMALY_BASELINES = ("weekday", "rolling")
+
+
+def validate_anomalies(cfg: AnomaliesConfig) -> AnomaliesConfig:
+    """Reject anomaly settings that cannot produce meaningful results."""
+    if cfg.metric not in ANOMALY_METRICS:
+        raise ConfigError(f"'anomalies.metric' must be one of {', '.join(ANOMALY_METRICS)}")
+    if cfg.baseline not in ANOMALY_BASELINES:
+        raise ConfigError(f"'anomalies.baseline' must be one of {', '.join(ANOMALY_BASELINES)}")
+    if cfg.window < 2 or not 2 <= cfg.min_history <= cfg.window:
+        raise ConfigError("'anomalies' needs window >= 2 and 2 <= min_history <= window")
+    if cfg.z_threshold <= 0 or cfg.min_pct_change < 0 or cfg.min_spread_ratio < 0 or cfg.limit < 0:
+        raise ConfigError("'anomalies' thresholds must be positive (z_threshold) or zero or more (the rest)")
+    return cfg
+
+
 def parse_ctr_curve(data: Any) -> Dict[int, float]:
     if not isinstance(data, dict) or not data:
         raise ConfigError("'ctr_curve' must be a non-empty mapping of position -> CTR")
@@ -152,6 +185,8 @@ def from_dict(data: Optional[Dict[str, Any]]) -> Config:
     for key, value in data.items():
         if key in _SECTIONS:
             setattr(cfg, key, _build_section(_SECTIONS[key], key, value))
+            if key == "anomalies":
+                validate_anomalies(cfg.anomalies)
         elif key == "ctr_curve":
             cfg.ctr_curve = parse_ctr_curve(value)
         elif key in ("title", "top_n"):
@@ -238,4 +273,17 @@ movers:
   min_impressions: 50
   min_position_change: 3
   limit: 10
+
+# Daily anomalies (needs Dates.csv). Each day is compared with the days before it.
+anomalies:
+  metric: clicks            # clicks, impressions, ctr or position
+  baseline: weekday         # weekday (day-of-week aware) or rolling (plain median)
+  window: 28                # trailing days used as the baseline
+  min_history: 14           # days of history needed before a day is scored
+  z_threshold: 3.0          # robust z-score (median absolute deviation)
+  min_pct_change: 20        # and at least this % away from expected
+  min_spread_ratio: 0.05    # spread floor as a fraction of the expected value
+  min_expected: 10          # skip days expecting fewer clicks/impressions
+  fill_gaps: true           # dates missing from the export count as zero
+  limit: 50
 """
