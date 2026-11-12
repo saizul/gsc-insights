@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 
 from .analysis import (
+    Anomaly,
     BrandSplit,
     Cannibalisation,
     Change,
@@ -16,6 +17,7 @@ from .analysis import (
     compare,
     compile_brand,
     declining,
+    find_anomalies,
     find_cannibalisation,
     find_movers,
     quick_wins,
@@ -35,6 +37,7 @@ class Insights:
     totals: Totals = (0, 0, 0.0)
     previous_totals: Optional[Totals] = None
     trend: List[Tuple[str, int, int]] = field(default_factory=list)
+    anomalies: List[Anomaly] = field(default_factory=list)
     quick_wins_queries: List[QuickWin] = field(default_factory=list)
     quick_wins_pages: List[QuickWin] = field(default_factory=list)
     branded: Optional[BrandSplit] = None
@@ -57,6 +60,7 @@ def build_insights(current: Dataset, previous: Optional[Dataset], cfg: Config) -
     dates = current.get("dates")
     if dates:
         out.trend = [(r.key, r.clicks, r.impressions) for r in sorted(dates, key=lambda r: r.key)]
+        out.anomalies = find_anomalies(dates, cfg.anomalies)
 
     queries = current.get("queries")
     pages = current.get("pages")

@@ -1,5 +1,6 @@
 """Analysis routines. Each takes tables plus config and returns plain dataclasses."""
 
+from .anomalies import Anomaly, find_anomalies
 from .branded import BrandSplit, compile_brand, is_branded, split_branded
 from .breakdown import ShareRow, breakdown
 from .cannibalisation import Cannibalisation, find_cannibalisation, normalize_url
@@ -8,6 +9,7 @@ from .movers import Movers, find_movers
 from .quick_wins import QuickWin, quick_wins
 
 __all__ = [
+    "Anomaly",
     "BrandSplit",
     "Cannibalisation",
     "Change",
@@ -18,6 +20,7 @@ __all__ = [
     "compare",
     "compile_brand",
     "declining",
+    "find_anomalies",
     "find_cannibalisation",
     "find_movers",
     "is_branded",

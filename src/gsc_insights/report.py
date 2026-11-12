@@ -73,6 +73,14 @@ def _change_rows(changes: Sequence[Change]) -> List[List[str]]:
     ]
 
 
+def _metric_cell(value: float, metric: str) -> str:
+    if metric == "ctr":
+        return fmt_pct(value)
+    if metric == "position":
+        return fmt_pos(value)
+    return fmt_int(value)
+
+
 CHANGE_HEADERS = ["Key", "Status", "Clicks A", "Clicks B", "Change", "%", "Pos A", "Pos B"]
 
 
@@ -113,6 +121,32 @@ def build_sections(ins: Insights) -> List[Dict[str, Any]]:
 
     quick("queries", ins.quick_wins_queries)
     quick("pages", ins.quick_wins_pages)
+
+    if ins.anomalies:
+        metric = ins.anomalies[0].metric
+        as_pct = metric == "ctr"
+        sections.append(
+            _section(
+                "anomalies",
+                f"Daily anomalies: {metric}",
+                ["Date", "Day", "Actual", "Expected", "Change", "%", "z", "Direction"],
+                [
+                    [
+                        a.date,
+                        a.weekday,
+                        _metric_cell(a.value, metric),
+                        _metric_cell(a.expected, metric),
+                        fmt_delta(a.delta * 100, 2) + " pp" if as_pct else fmt_delta(a.delta, 1),
+                        "-" if a.pct_change is None else fmt_delta(a.pct_change, 1) + "%",
+                        fmt_delta(a.z_score, 1),
+                        a.direction + (" (missing day)" if a.missing else ""),
+                    ]
+                    for a in ins.anomalies
+                ],
+                "Days that broke sharply from the trailing baseline of the days before them. "
+                "Check for tracking, indexing or algorithm changes around these dates.",
+            )
+        )
 
     if ins.branded:
         seg = ins.branded.segments()
@@ -282,6 +316,7 @@ def csv_exports(ins: Insights) -> List[Tuple[str, str, List[Any]]]:
         ("quick_wins_queries.csv", "quick_wins", ins.quick_wins_queries),
         ("quick_wins_pages.csv", "quick_wins", ins.quick_wins_pages),
         ("cannibalisation.csv", "cannibalisation", ins.cannibalisation),
+        ("anomalies.csv", "anomalies", ins.anomalies),
         ("devices.csv", "breakdown", ins.devices),
         ("countries.csv", "breakdown", ins.countries),
         ("declining_queries.csv", "changes", ins.declining_queries),

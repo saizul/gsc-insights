@@ -5,7 +5,7 @@
 
 Turn Google Search Console **Performance** exports into things you can act on:
 quick wins, declining queries and pages, keyword cannibalisation, a branded vs
-non-branded split, top movers and device/country breakdowns. Everything runs
+non-branded split, top movers, daily traffic anomalies and device/country breakdowns. Everything runs
 locally on the CSV files you download. No API keys, no OAuth, no uploads.
 
 Built by [Saizul Amin](https://saizul.com), a WordPress developer and SEO specialist.
@@ -20,6 +20,7 @@ Built by [Saizul Amin](https://saizul.com), a WordPress developer and SEO specia
 | `cannibalisation` | Which queries are served by two or more of your pages? |
 | `branded` | How much traffic comes from brand searches (regex-based)? |
 | `breakdown` | How are clicks and impressions split by device or country? |
+| `anomalies` | Which days broke sharply from their recent baseline (outages, tracking breaks, sudden spikes)? |
 | `report` | All of the above as one HTML file plus CSV files. |
 
 ## Install
@@ -61,6 +62,7 @@ gsc-insights movers examples/period_a examples/period_b --kind losers
 gsc-insights cannibalisation examples/period_b
 gsc-insights branded examples/period_b --brand "bright\s*leaf"
 gsc-insights breakdown examples/period_b --by countries --limit 5
+gsc-insights anomalies examples/period_b
 gsc-insights report examples/period_b --compare examples/period_a \
     --config examples/config.yml --out gsc-report
 ```
@@ -82,6 +84,14 @@ impression threshold for a single run without editing your config file (it overr
 gsc-insights quick-wins export.zip --min-impressions 500
 ```
 
+`anomalies` reads the `Dates.csv` file (or any file with a date column) and accepts
+`--metric clicks|impressions|ctr|position`, `--baseline weekday|rolling`, `--window DAYS`,
+`--threshold Z` and `--min-pct-change PCT`, each overriding the `anomalies` config section.
+
+```bash
+gsc-insights anomalies export.zip --metric impressions --baseline rolling --window 14
+```
+
 ## How the analyses work
 
 **Quick wins.** A row qualifies when its average position is between `min_position` and
@@ -100,6 +110,20 @@ percent. Rows that disappeared entirely are included with status `lost`.
 (each with at least `min_page_impressions`) are listed. URLs are normalised (query string,
 fragment, trailing slash and host case are ignored) unless you disable `normalize_urls`.
 Severity depends on how much impression share the strongest page holds.
+
+**Anomalies.** Each day is compared only with the days before it (the trailing `window`), so
+the answer is the one an alert would have given on that day; the first `min_history` days are
+not scored. The `weekday` baseline is the window's median scaled by a day-of-week factor learnt
+from the same window, so normal weekend dips are not reported. Until a weekday has three
+observations in the window, the weekday/weekend group factor is used instead, which keeps one
+odd day from skewing the factor. The `rolling` baseline is the plain median. The spread is the
+median absolute deviation of the window's residuals, floored at `min_spread_ratio` of the expected
+value. A day is reported when its robust z-score reaches `z_threshold` **and** it is at least
+`min_pct_change` percent away from expected. Flagged days are replaced by their expected value
+before they serve as history, so an outage does not hide the days after it. Dates missing
+from the export count as zero clicks and impressions (`missing: true`) unless `fill_gaps` is
+false; for `ctr` and `position` such days are skipped. For `position`, a `spike` means the
+average ranking got worse.
 
 **Branded split.** Patterns in `brand.patterns` are case-insensitive regular expressions
 combined with OR.
@@ -123,6 +147,10 @@ quick_wins:
 declining:
   min_click_drop: 5
   min_pct_drop: 20
+anomalies:
+  metric: clicks
+  baseline: weekday
+  z_threshold: 3.0
 ```
 
 Unknown keys are rejected so typos do not pass silently. See `examples/config.yml` for every option.
@@ -131,7 +159,8 @@ Unknown keys are rejected so typos do not pass silently. See `examples/config.ym
 
 `gsc-insights report` writes `index.html` (self-contained, no external assets, values are
 HTML-escaped) and a `csv/` folder with one file per result set, for example
-`quick_wins_queries.csv`, `cannibalisation.csv`, `declining_queries.csv`, `movers_queries_gainers.csv`.
+`quick_wins_queries.csv`, `cannibalisation.csv`, `anomalies.csv`, `declining_queries.csv`,
+`movers_queries_gainers.csv`.
 Sections that need data you did not provide (for example query + page data or a second period)
 are left out.
 
@@ -141,7 +170,8 @@ are left out.
 src/gsc_insights/
   loader.py        read folders, ZIPs and CSVs into tables
   config.py        YAML config, CTR curve
-  analysis/        quick_wins, compare (declining), movers, cannibalisation, branded, breakdown
+  analysis/        quick_wins, compare (declining), movers, cannibalisation, branded, breakdown,
+                   anomalies
   insights.py      run every analysis
   report.py        HTML + CSV report
   cli.py           command line interface

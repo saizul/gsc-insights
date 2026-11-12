@@ -44,3 +44,16 @@ movers:
   min_impressions: 50
   min_position_change: 3
   limit: 10
+
+# Daily anomalies (needs Dates.csv). Each day is compared with the days before it.
+anomalies:
+  metric: clicks            # clicks, impressions, ctr or position
+  baseline: weekday         # weekday (day-of-week aware) or rolling (plain median)
+  window: 28                # trailing days used as the baseline
+  min_history: 14           # days of history needed before a day is scored
+  z_threshold: 3.0          # robust z-score (median absolute deviation)
+  min_pct_change: 20        # and at least this % away from expected
+  min_spread_ratio: 0.05    # spread floor as a fraction of the expected value
+  min_expected: 10          # skip days expecting fewer clicks/impressions
+  fill_gaps: true           # dates missing from the export count as zero
+  limit: 50
