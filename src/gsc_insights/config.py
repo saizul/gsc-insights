@@ -85,6 +85,14 @@ class AnomaliesConfig:
 
 
 @dataclass
+class SectionsConfig:
+    depth: int = 1
+    fallback: str = "folder"
+    groups: Dict[str, str] = field(default_factory=dict)
+    limit: int = 50
+
+
+@dataclass
 class BrandConfig:
     patterns: List[str] = field(default_factory=list)
 
@@ -100,6 +108,7 @@ class Config:
     cannibalisation: CannibalisationConfig = field(default_factory=CannibalisationConfig)
     movers: MoversConfig = field(default_factory=MoversConfig)
     anomalies: AnomaliesConfig = field(default_factory=AnomaliesConfig)
+    sections: SectionsConfig = field(default_factory=SectionsConfig)
 
 
 _SECTIONS = {
@@ -109,6 +118,7 @@ _SECTIONS = {
     "cannibalisation": CannibalisationConfig,
     "movers": MoversConfig,
     "anomalies": AnomaliesConfig,
+    "sections": SectionsConfig,
 }
 
 
@@ -125,6 +135,14 @@ def _coerce(name: str, value: Any, default: Any) -> Any:
         if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
             raise ConfigError(f"'{name}' must be a list of strings")
         return list(value)
+    if isinstance(default, dict):
+        if not isinstance(value, dict) or not all(isinstance(v, str) for v in value.values()):
+            raise ConfigError(f"'{name}' must be a mapping of name -> regex string")
+        return {str(k): v for k, v in value.items()}
+    if isinstance(default, str):
+        if not isinstance(value, str):
+            raise ConfigError(f"'{name}' must be a string")
+        return value
     return value
 
 
@@ -159,6 +177,24 @@ def validate_anomalies(cfg: AnomaliesConfig) -> AnomaliesConfig:
     return cfg
 
 
+SECTION_FALLBACKS = ("folder", "other")
+
+
+def validate_sections(cfg: SectionsConfig) -> SectionsConfig:
+    """Reject section settings that cannot be applied."""
+    if cfg.depth < 0 or cfg.limit < 0:
+        raise ConfigError("'sections.depth' and 'sections.limit' must be 0 or greater")
+    if cfg.fallback not in SECTION_FALLBACKS:
+        raise ConfigError(f"'sections.fallback' must be one of {', '.join(SECTION_FALLBACKS)}")
+    if cfg.fallback == "other" and not cfg.groups:
+        raise ConfigError("'sections.fallback: other' needs at least one entry in 'sections.groups'")
+    # Compile now so a bad regex is reported when the config is loaded.
+    from .analysis.sections import compile_groups
+
+    compile_groups(cfg.groups)
+    return cfg
+
+
 def parse_ctr_curve(data: Any) -> Dict[int, float]:
     if not isinstance(data, dict) or not data:
         raise ConfigError("'ctr_curve' must be a non-empty mapping of position -> CTR")
@@ -187,6 +223,8 @@ def from_dict(data: Optional[Dict[str, Any]]) -> Config:
             setattr(cfg, key, _build_section(_SECTIONS[key], key, value))
             if key == "anomalies":
                 validate_anomalies(cfg.anomalies)
+            elif key == "sections":
+                validate_sections(cfg.sections)
         elif key == "ctr_curve":
             cfg.ctr_curve = parse_ctr_curve(value)
         elif key in ("title", "top_n"):
@@ -285,5 +323,15 @@ anomalies:
   min_spread_ratio: 0.05    # spread floor as a fraction of the expected value
   min_expected: 10          # skip days expecting fewer clicks/impressions
   fill_gaps: true           # dates missing from the export count as zero
+  limit: 50
+
+# Site sections: pages rolled up by URL folder or by named regex groups.
+sections:
+  depth: 1                  # URL folders used for the automatic label (/blog/, /shop/)
+  fallback: folder          # folder: unmatched pages use their folder; other: "(other)"
+  groups:                   # optional, first match wins; tested against the URL path
+    Blog: "^/blog/"
+    Guides: "^/guides/"
+    Shop: "^/shop/"
   limit: 50
 """

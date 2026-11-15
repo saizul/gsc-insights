@@ -19,6 +19,7 @@ from .analysis import (
     find_movers,
     quick_wins,
     split_branded,
+    summarise_sections,
 )
 from .config import (
     ANOMALY_BASELINES,
@@ -27,6 +28,7 @@ from .config import (
     Config,
     load_config,
     validate_anomalies,
+    validate_sections,
 )
 from .errors import ConfigError, GscInsightsError, LoadError
 from .insights import build_insights
@@ -122,6 +124,24 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--min-pct-change", type=float, metavar="PCT", help="minimum %% change from expected")
     _common(p)
 
+    p = sub.add_parser("sections", help="clicks and impressions rolled up by site section")
+    p.add_argument("export", help="export with Pages.csv")
+    p.add_argument("--compare", metavar="PERIOD_A", help="earlier export to compare against")
+    p.add_argument("--depth", type=_non_negative_int, metavar="N", help="URL folders in the section label")
+    p.add_argument(
+        "--group",
+        action="append",
+        default=[],
+        metavar="NAME=REGEX",
+        help="named section for paths matching REGEX (repeatable, replaces config groups)",
+    )
+    p.add_argument(
+        "--fallback",
+        choices=("folder", "other"),
+        help="label for pages no group matches: their folder (default) or (other)",
+    )
+    _common(p)
+
     p = sub.add_parser("report", help="write an HTML report and CSV files")
     p.add_argument("export")
     p.add_argument("--compare", metavar="PERIOD_A", help="earlier export to compare against")
@@ -141,7 +161,9 @@ def _table(ds: Dataset, name: str) -> Table:
     return table
 
 
-def _emit(args: argparse.Namespace, title: str, kind: str, items: Sequence[Any]) -> None:
+def _emit(
+    args: argparse.Namespace, title: str, kind: str, items: Sequence[Any], display: Optional[str] = None
+) -> None:
     records = to_records(items)
     columns = COLUMNS[kind]
     fmt = args.format
@@ -154,7 +176,7 @@ def _emit(args: argparse.Namespace, title: str, kind: str, items: Sequence[Any])
     elif fmt == "json":
         sys.stdout.write(to_json_text(records))
     else:
-        print_table(title, records, columns, kind)
+        print_table(title, records, columns, display or kind)
 
 
 def _limit(args: argparse.Namespace) -> Optional[int]:
@@ -235,6 +257,41 @@ def cmd_anomalies(args: argparse.Namespace, cfg: Config) -> None:
     _emit(args, f"Daily {section.metric} anomalies ({section.baseline} baseline)", "anomalies", items)
 
 
+def _parse_groups(values: Sequence[str]) -> Dict[str, str]:
+    groups: Dict[str, str] = {}
+    for value in values:
+        name, sep, regex = value.partition("=")
+        if not sep or not name.strip() or not regex:
+            raise ConfigError(f"--group expects NAME=REGEX, got {value!r}")
+        groups[name.strip()] = regex
+    return groups
+
+
+def cmd_sections(args: argparse.Namespace, cfg: Config) -> None:
+    current = load(args.export)
+    previous = _table(load(args.compare), "pages") if args.compare else None
+    overrides: Dict[str, Any] = {}
+    if args.depth is not None:
+        overrides["depth"] = args.depth
+    if args.group:
+        overrides["groups"] = _parse_groups(args.group)
+    if args.fallback:
+        overrides["fallback"] = args.fallback
+    sc = validate_sections(dataclasses.replace(cfg.sections, **overrides))
+    limit = _limit(args)
+    items = summarise_sections(
+        _table(current, "pages"),
+        sc.groups,
+        sc.depth,
+        sc.fallback,
+        previous,
+        sc.limit if limit is None else limit,
+    )
+    title = "Site sections" + (" (A -> B)" if previous is not None else "")
+    kind = "sections_compare" if previous is not None else "sections"
+    _emit(args, title, "sections", items, display=kind)
+
+
 def cmd_report(args: argparse.Namespace, cfg: Config) -> None:
     current = load(args.export)
     previous = load(args.compare) if args.compare else None
@@ -261,6 +318,7 @@ COMMANDS: Dict[str, Callable[[argparse.Namespace, Config], None]] = {
     "branded": cmd_branded,
     "breakdown": cmd_breakdown,
     "anomalies": cmd_anomalies,
+    "sections": cmd_sections,
     "report": cmd_report,
     "init-config": cmd_init_config,
 }

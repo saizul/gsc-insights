@@ -57,3 +57,13 @@ anomalies:
   min_expected: 10          # skip days expecting fewer clicks/impressions
   fill_gaps: true           # dates missing from the export count as zero
   limit: 50
+
+# Site sections: pages rolled up by URL folder or by named regex groups.
+sections:
+  depth: 1                  # URL folders used for the automatic label (/blog/, /shop/)
+  fallback: folder          # folder: unmatched pages use their folder; other: "(other)"
+  groups:                   # optional, first match wins; tested against the URL path
+    Blog: "^/blog/"
+    Guides: "^/guides/"
+    Shop: "^/shop/"
+  limit: 50
