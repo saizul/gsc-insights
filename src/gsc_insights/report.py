@@ -148,6 +148,41 @@ def build_sections(ins: Insights) -> List[Dict[str, Any]]:
             )
         )
 
+    if ins.sections:
+        compared = ins.sections[0].status != ""
+        headers = ["Section", "Pages", "Clicks", "Impr.", "CTR", "Pos", "Click share"]
+        if compared:
+            headers += ["Clicks A", "Change", "%", "Pos change"]
+        rows = []
+        for s in ins.sections:
+            row = [
+                s.section + (f" ({s.status})" if s.status in ("new", "lost") else ""),
+                fmt_int(s.pages),
+                fmt_int(s.clicks),
+                fmt_int(s.impressions),
+                fmt_pct(s.ctr),
+                fmt_pos(s.position if s.pages else None),
+                fmt_pct(s.click_share),
+            ]
+            if compared:
+                row += [
+                    fmt_int(s.clicks_a or 0),
+                    fmt_delta(s.clicks_delta),
+                    "-" if s.clicks_pct is None else fmt_delta(s.clicks_pct, 1) + "%",
+                    fmt_delta(s.position_delta, 1),
+                ]
+            rows.append(row)
+        sections.append(
+            _section(
+                "sections",
+                "Site sections",
+                headers,
+                rows,
+                "Pages rolled up by URL folder or by the groups in the sections config. "
+                "Shows which part of the site drives (or lost) traffic.",
+            )
+        )
+
     if ins.branded:
         seg = ins.branded.segments()
         sections.append(
@@ -317,6 +352,7 @@ def csv_exports(ins: Insights) -> List[Tuple[str, str, List[Any]]]:
         ("quick_wins_pages.csv", "quick_wins", ins.quick_wins_pages),
         ("cannibalisation.csv", "cannibalisation", ins.cannibalisation),
         ("anomalies.csv", "anomalies", ins.anomalies),
+        ("sections.csv", "sections", ins.sections),
         ("devices.csv", "breakdown", ins.devices),
         ("countries.csv", "breakdown", ins.countries),
         ("declining_queries.csv", "changes", ins.declining_queries),

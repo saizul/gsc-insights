@@ -17,6 +17,7 @@ from .analysis.branded import Segment
 from .analysis.breakdown import ShareRow
 from .analysis.compare import Change
 from .analysis.quick_wins import QuickWin
+from .analysis.sections import SectionRow
 
 COLUMNS: Dict[str, List[str]] = {
     "quick_wins": [f.name for f in fields(QuickWin)],
@@ -24,6 +25,7 @@ COLUMNS: Dict[str, List[str]] = {
     "breakdown": [f.name for f in fields(ShareRow)],
     "branded": [f.name for f in fields(Segment)],
     "anomalies": [f.name for f in fields(Anomaly)],
+    "sections": [f.name for f in fields(SectionRow)],
     "cannibalisation": [
         "query",
         "pages",
@@ -75,6 +77,18 @@ def write_text(path: str | Path, text: str) -> Path:
 
 
 DISPLAY: Dict[str, List[str]] = {
+    "sections": ["section", "pages", "clicks", "impressions", "ctr", "position", "click_share", "top_page"],
+    "sections_compare": [
+        "section",
+        "status",
+        "pages",
+        "clicks_a",
+        "clicks",
+        "clicks_delta",
+        "clicks_pct",
+        "position_a",
+        "position",
+    ],
     "anomalies": [
         "date",
         "weekday",

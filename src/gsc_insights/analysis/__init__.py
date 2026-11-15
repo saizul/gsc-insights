@@ -7,6 +7,7 @@ from .cannibalisation import Cannibalisation, find_cannibalisation, normalize_ur
 from .compare import Change, compare, declining
 from .movers import Movers, find_movers
 from .quick_wins import QuickWin, quick_wins
+from .sections import SectionRow, assign_section, summarise_sections
 
 __all__ = [
     "Anomaly",
@@ -15,7 +16,9 @@ __all__ = [
     "Change",
     "Movers",
     "QuickWin",
+    "SectionRow",
     "ShareRow",
+    "assign_section",
     "breakdown",
     "compare",
     "compile_brand",
@@ -27,4 +30,5 @@ __all__ = [
     "normalize_url",
     "quick_wins",
     "split_branded",
+    "summarise_sections",
 ]

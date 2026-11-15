@@ -12,6 +12,7 @@ from .analysis import (
     Change,
     Movers,
     QuickWin,
+    SectionRow,
     ShareRow,
     breakdown,
     compare,
@@ -22,6 +23,7 @@ from .analysis import (
     find_movers,
     quick_wins,
     split_branded,
+    summarise_sections,
 )
 from .config import Config
 from .models import Dataset
@@ -48,6 +50,7 @@ class Insights:
     declining_pages: List[Change] = field(default_factory=list)
     movers_queries: Optional[Movers] = None
     movers_pages: Optional[Movers] = None
+    sections: List[SectionRow] = field(default_factory=list)
 
 
 def build_insights(current: Dataset, previous: Optional[Dataset], cfg: Config) -> Insights:
@@ -70,6 +73,15 @@ def build_insights(current: Dataset, previous: Optional[Dataset], cfg: Config) -
             out.branded = split_branded(queries, cfg.brand.patterns, cfg.top_n)
     if pages:
         out.quick_wins_pages = quick_wins(pages, cfg.ctr_curve, cfg.quick_wins)
+        sc = cfg.sections
+        out.sections = summarise_sections(
+            pages,
+            sc.groups,
+            sc.depth,
+            sc.fallback,
+            previous.get("pages") if previous is not None else None,
+            sc.limit,
+        )
     if current.has("devices"):
         out.devices = breakdown(current.tables["devices"])
     if current.has("countries"):

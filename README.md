@@ -21,6 +21,7 @@ Built by [Saizul Amin](https://saizul.com), a WordPress developer and SEO specia
 | `branded` | How much traffic comes from brand searches (regex-based)? |
 | `breakdown` | How are clicks and impressions split by device or country? |
 | `anomalies` | Which days broke sharply from their recent baseline (outages, tracking breaks, sudden spikes)? |
+| `sections` | Which parts of the site (URL folders or your own named groups) drive traffic, and which grew or shrank? |
 | `report` | All of the above as one HTML file plus CSV files. |
 
 ## Install
@@ -63,6 +64,7 @@ gsc-insights cannibalisation examples/period_b
 gsc-insights branded examples/period_b --brand "bright\s*leaf"
 gsc-insights breakdown examples/period_b --by countries --limit 5
 gsc-insights anomalies examples/period_b
+gsc-insights sections examples/period_b --compare examples/period_a
 gsc-insights report examples/period_b --compare examples/period_a \
     --config examples/config.yml --out gsc-report
 ```
@@ -90,6 +92,18 @@ gsc-insights quick-wins export.zip --min-impressions 500
 
 ```bash
 gsc-insights anomalies export.zip --metric impressions --baseline rolling --window 14
+```
+
+`sections` reads `Pages.csv` and rolls pages up into site sections. `--compare PERIOD_A` adds
+period A clicks, the change and the position change per section. `--depth N` sets how many URL
+folders form the automatic label, `--group NAME=REGEX` (repeatable) defines named sections and
+replaces the config groups for that run, and `--fallback other` puts pages that match no group
+into `(other)` instead of their folder.
+
+```bash
+gsc-insights sections export.zip --depth 2
+gsc-insights sections export.zip --compare last-month.zip \
+    --group "Docs=^/(docs|help)/" --group "Store=^/shop/" -f csv -o sections.csv
 ```
 
 ## How the analyses work
@@ -125,6 +139,15 @@ from the export count as zero clicks and impressions (`missing: true`) unless `f
 false; for `ctr` and `position` such days are skipped. For `position`, a `spike` means the
 average ranking got worse.
 
+**Site sections.** Each page is matched against `sections.groups` in order; the first regex
+(case-insensitive, tested against the decoded URL path only, never the host or query string)
+names its section. Pages no group matches use their first `depth` path folders, so
+`/blog/2026/post/` is `/blog/` at depth 1 and `/blog/2026/` at depth 2; a trailing file name such
+as `post.html` is not treated as a folder, and the home page is `/`. Clicks and impressions are
+summed, and position is weighted by impressions. With a second period, sections are `changed`,
+`new` (only in period B) or `lost` (only in period A), and `position_delta` is positive when the
+section ranks worse.
+
 **Branded split.** Patterns in `brand.patterns` are case-insensitive regular expressions
 combined with OR.
 
@@ -151,6 +174,11 @@ anomalies:
   metric: clicks
   baseline: weekday
   z_threshold: 3.0
+sections:
+  depth: 1
+  groups:
+    Blog: "^/blog/"
+    Shop: "^/shop/"
 ```
 
 Unknown keys are rejected so typos do not pass silently. See `examples/config.yml` for every option.
@@ -159,7 +187,7 @@ Unknown keys are rejected so typos do not pass silently. See `examples/config.ym
 
 `gsc-insights report` writes `index.html` (self-contained, no external assets, values are
 HTML-escaped) and a `csv/` folder with one file per result set, for example
-`quick_wins_queries.csv`, `cannibalisation.csv`, `anomalies.csv`, `declining_queries.csv`,
+`quick_wins_queries.csv`, `cannibalisation.csv`, `anomalies.csv`, `sections.csv`, `declining_queries.csv`,
 `movers_queries_gainers.csv`.
 Sections that need data you did not provide (for example query + page data or a second period)
 are left out.
@@ -171,7 +199,7 @@ src/gsc_insights/
   loader.py        read folders, ZIPs and CSVs into tables
   config.py        YAML config, CTR curve
   analysis/        quick_wins, compare (declining), movers, cannibalisation, branded, breakdown,
-                   anomalies
+                   anomalies, sections
   insights.py      run every analysis
   report.py        HTML + CSV report
   cli.py           command line interface

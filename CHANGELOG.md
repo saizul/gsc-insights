@@ -7,6 +7,16 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `sections` command: rolls pages up into site sections, either the first `--depth` URL
+  folders (`/blog/`, `/shop/`) or named regex groups (`--group NAME=REGEX` or the new
+  `sections` config section, first match wins, matched against the URL path). With
+  `--compare PERIOD_A` each section shows period A clicks, the change and the position change,
+  and sections that only exist in one period are marked `new` or `lost`. `--fallback other`
+  collects unmatched pages in `(other)`.
+- `report` includes a "Site sections" section and `csv/sections.csv` when the export has page
+  data; it is compared with period A when `--compare` is given.
+- Config validation for string options: a non-string value such as `anomalies.metric: 1` is now
+  rejected with a clear message.
 - `--min-impressions N` option for `quick-wins`, `declining` and `movers`, overriding
   the `min_impressions` value from the config for a single run.
 - `anomalies` command: flags days whose clicks, impressions, CTR or position break
